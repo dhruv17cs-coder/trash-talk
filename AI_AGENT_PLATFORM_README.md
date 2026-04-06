@@ -9,89 +9,52 @@ This document outlines a comprehensive AI agent platform engineered for competit
 ### Model Distribution & Runtime Management
 
 #### Intelligent Model Packaging Pipeline
-The system implements a robust model distribution architecture that orchestrates the packaging of trained neural network artifacts into versioned deployment containers. The pipeline incorporates:
 
-- **Semantic Versioning**: Automated versioning based on model performance metrics and architectural changes
-- **Artifact Validation**: Pre-deployment health checks including gradient flow analysis and inference latency benchmarking
-- **Progressive Rollout**: Canary deployment strategies with automated rollback mechanisms triggered by performance degradation thresholds
+The system implements a robust model distribution architecture that orchestrates the packaging of trained neural network artifacts into versioned deployment containers. The pipeline incorporates semantic versioning, artifact validation, and progressive rollout strategies.
 
-**Implementation Details:**
+**Key Features:**
+- Automated versioning based on model performance metrics
+- Pre-deployment health checks including gradient flow analysis
+- Canary deployment with automated rollback mechanisms
+
 ```python
 class ModelPackagingPipeline:
     def __init__(self, model_registry, artifact_store):
         self.registry = model_registry
         self.store = artifact_store
-        self.version_semantic = SemanticVersionManager()
 
     async def package_model(self, model_id: str, weights: torch.Tensor,
                           config: Dict[str, Any]) -> ModelArtifact:
-        # Gradient flow validation
-        gradient_flow_score = self._validate_gradient_flow(weights)
-
-        # Latency benchmarking
+        # Gradient flow validation and latency benchmarking
+        gradient_score = self._validate_gradient_flow(weights)
         latency_profile = await self._benchmark_inference_latency(model_id)
 
-        # Semantic versioning
+        # Semantic versioning based on performance
         version = self.version_semantic.generate_version(
-            model_id, gradient_flow_score, latency_profile
+            model_id, gradient_score, latency_profile
         )
 
-        # Package artifact
-        artifact = ModelArtifact(
-            model_id=model_id,
-            version=version,
-            weights=weights,
-            config=config,
-            metadata={
-                'gradient_flow_score': gradient_flow_score,
-                'latency_p95': latency_profile.p95,
-                'validation_timestamp': datetime.utcnow()
-            }
-        )
-
-        return await self.store.persist_artifact(artifact)
+        return await self.store.persist_artifact(ModelArtifact(
+            model_id, version, weights, config,
+            metadata={'gradient_score': gradient_score, 'latency_p95': latency_profile.p95}
+        ))
 ```
 
 #### Dynamic Configuration Management
-A sophisticated hyperparameter tuning layer enables runtime parameter adjustment without service interruption:
+
+A sophisticated hyperparameter tuning layer enables runtime parameter adjustment without service interruption, supporting exploration rates, learning decay, and action space pruning.
 
 ```javascript
-// Example configuration update mechanism
-const configUpdate = {
-  agentId: "agent_001",
-  parameters: {
-    exploration_rate: 0.15,
-    learning_rate_decay: 0.95,
-    action_space_pruning: true
-  },
-  rollback_window: 300000, // 5 minutes
-  validation_schema: {
-    exploration_rate: { type: 'number', min: 0.0, max: 1.0 },
-    learning_rate_decay: { type: 'number', min: 0.1, max: 0.99 },
-    action_space_pruning: { type: 'boolean' }
-  }
-};
-
-// Runtime parameter injection with validation
 class DynamicConfigManager {
   async updateAgentConfig(agentId, newConfig) {
-    // Pre-validation of parameters
-    const validationResult = await this.validateConfig(newConfig);
+    const validation = await this.validateConfig(newConfig);
+    if (!validation.isValid) throw new ConfigurationError(validation.errors);
 
-    if (!validationResult.isValid) {
-      throw new ConfigurationError(validationResult.errors);
-    }
-
-    // Atomic parameter update with rollback capability
     const rollbackToken = await this.createRollbackPoint(agentId);
-
     try {
       await this.injectParameters(agentId, newConfig.parameters);
       await this.verifyParameterInjection(agentId, newConfig);
-
-      // Schedule automatic rollback if degradation detected
       this.scheduleHealthCheck(agentId, newConfig.rollback_window);
-
     } catch (error) {
       await this.rollbackToPoint(rollbackToken);
       throw error;
@@ -101,94 +64,36 @@ class DynamicConfigManager {
 ```
 
 #### Health Monitoring & Fallback Systems
-The platform maintains multiple model versions with automatic failover:
 
-```go
-type ModelHealthMonitor struct {
-    primaryModel     *ModelInstance
-    secondaryModel   *ModelInstance
-    archivalModels   []*ModelInstance
-    healthChecker    *HealthChecker
-    failoverManager  *FailoverManager
-}
-
-func (mhm *ModelHealthMonitor) monitorModelHealth(ctx context.Context) {
-    ticker := time.NewTicker(30 * time.Second)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case <-ctx.Done():
-            return
-        case <-ticker.C:
-            health := mhm.healthChecker.CheckHealth(mhm.primaryModel)
-
-            if health.Status != Healthy {
-                log.Printf("Primary model unhealthy: %v", health.Reason)
-
-                // Initiate failover sequence
-                if err := mhm.failoverManager.InitiateFailover(
-                    mhm.primaryModel, mhm.secondaryModel); err != nil {
-                    log.Printf("Failover failed: %v", err)
-                    // Escalate to archival model
-                    mhm.activateArchivalModel()
-                }
-            }
-        }
-    }
-}
+The platform maintains multiple model versions with automatic failover, ensuring continuous service availability through primary, secondary, and archival model hierarchies.
 ```
+
+#### Health Monitoring & Fallback Systems
+
+The platform maintains multiple model versions with automatic failover, ensuring continuous service availability through primary, secondary, and archival model hierarchies.
 
 ### AI Matchmaking Intelligence
 
 #### Skill Profiling Engine
-The core matchmaking algorithm employs multi-dimensional skill assessment:
 
-**Performance Metrics Aggregation:**
-- Win-rate variance analysis across different game modes
+The core matchmaking algorithm employs multi-dimensional skill assessment, analyzing win rates, reaction times, and strategic complexity to create balanced competitive pairings.
+
+**Performance Metrics:**
+- Win-rate variance analysis across game modes
 - Latency pattern recognition for reaction time profiling
-- Decision tree complexity scoring for strategic depth evaluation
+- Decision complexity scoring for strategic depth evaluation
 
-**Composite Scoring Algorithm:**
 ```python
-def calculate_matchmaking_score(agent_metrics: Dict[str, float],
-                               weights: Dict[str, float]) -> float:
-    """
-    Computes composite matchmaking score using multi-dimensional analysis.
-
-    Args:
-        agent_metrics: Dictionary containing agent performance metrics
-        weights: Normalized weights for each metric component
-
-    Returns:
-        Composite matchmaking score between 0.0 and 1.0
-    """
-
-    # Win-rate variance analysis with confidence intervals
+def calculate_matchmaking_score(agent_metrics: Dict[str, float], weights: Dict[str, float]) -> float:
     win_rate_score = calculate_win_rate_variance(
-        agent_metrics['wins'], agent_metrics['total_games'],
-        confidence_level=0.95
+        agent_metrics['wins'], agent_metrics['total_games'], confidence_level=0.95
     )
-
-    # Latency pattern recognition using time-series analysis
     latency_score = analyze_latency_patterns(
-        agent_metrics['reaction_times'],
-        method='exponential_moving_average',
-        alpha=0.3
+        agent_metrics['reaction_times'], method='exponential_moving_average', alpha=0.3
     )
+    complexity_score = compute_decision_entropy(agent_metrics['decision_sequences'], normalize=True)
+    adaptability_score = calculate_adaptability_variance(agent_metrics['map_performance_matrix'])
 
-    # Decision complexity scoring via entropy analysis
-    complexity_score = compute_decision_entropy(
-        agent_metrics['decision_sequences'],
-        normalize=True
-    )
-
-    # Map performance variance across different game modes
-    adaptability_score = calculate_adaptability_variance(
-        agent_metrics['map_performance_matrix']
-    )
-
-    # Weighted composite calculation with normalization
     composite_score = (
         weights['win_rate'] * normalize_score(win_rate_score, 'win_rate') +
         weights['latency'] * normalize_score(latency_score, 'latency') +
@@ -200,7 +105,8 @@ def calculate_matchmaking_score(agent_metrics: Dict[str, float],
 ```
 
 #### Active Agent Pool Management
-The system maintains a dynamic agent pool with sophisticated state management:
+
+The system maintains a dynamic agent pool with sophisticated state management, including queue tracking, preference learning, and computational load balancing.
 
 ```typescript
 interface AgentPoolState {
@@ -211,29 +117,19 @@ interface AgentPoolState {
 }
 
 class AgentPoolManager {
-  private poolState: AgentPoolState;
-  private loadBalancer: LoadBalancer;
-  private preferenceLearner: PreferenceLearningEngine;
-
   async addAgentToPool(agentId: string, agentConfig: AgentConfig): Promise<void> {
-    // Capacity validation
     if (this.poolState.activeAgents.size >= this.maxPoolSize) {
       throw new PoolCapacityError('Maximum pool capacity reached');
     }
 
-    // Agent health verification
     const healthCheck = await this.performAgentHealthCheck(agentId);
     if (!healthCheck.passed) {
       throw new AgentHealthError(`Agent ${agentId} failed health check`);
     }
 
-    // Load balancing assignment
     const optimalShard = this.loadBalancer.assignAgentToShard(agentId);
-
-    // Preference learning initialization
     const initialPreferences = this.preferenceLearner.initializePreferences(agentId);
 
-    // Atomic pool state update
     await this.updatePoolState(agentId, {
       status: 'active',
       shard: optimalShard,
@@ -241,287 +137,79 @@ class AgentPoolManager {
       joinedAt: Date.now()
     });
   }
-
-  async optimizePoolDistribution(): Promise<void> {
-    // Real-time load balancing
-    const currentDistribution = this.analyzePoolDistribution();
-
-    // Predictive scaling based on queue depth
-    const scalingRecommendation = this.predictScalingNeeds(
-      this.poolState.queuedAgents.size,
-      currentDistribution
-    );
-
-    if (scalingRecommendation.shouldScale) {
-      await this.performPoolScaling(scalingRecommendation);
-    }
-
-    // Preference-based agent redistribution
-    const redistributionPlan = this.calculateOptimalRedistribution();
-    await this.executeRedistribution(redistributionPlan);
-  }
 }
 ```
 
 #### Progressive Bracket Expansion
-When optimal pairings cannot be achieved within latency thresholds, the system implements geometric bracket expansion:
+
+When optimal pairings cannot be achieved within latency thresholds, the system implements geometric bracket expansion to maintain matchmaking quality.
 
 ```python
 class ProgressiveBracketExpansion:
-    def __init__(self, base_range: float, max_expansion: float,
-                 expansion_rate: float, threshold: float):
+    def __init__(self, base_range: float, max_expansion: float, expansion_rate: float, threshold: float):
         self.base_range = base_range
         self.max_expansion = max_expansion
         self.expansion_rate = expansion_rate
         self.threshold = threshold
 
     def calculate_expansion_factor(self, wait_time: float) -> float:
-        """
-        Calculates geometric expansion factor based on wait time.
-
-        Uses exponential backoff with clamping to prevent excessive expansion.
-        """
         if wait_time <= self.threshold:
             return 1.0
 
-        # Exponential expansion with time-based scaling
         time_ratio = wait_time / self.threshold
         raw_expansion = self.expansion_rate * (time_ratio ** 2)
-
-        # Clamp to maximum expansion factor
         expansion_factor = min(raw_expansion, self.max_expansion)
 
-        # Apply smoothing function to prevent abrupt changes
-        smoothed_factor = self._smooth_expansion(expansion_factor)
-
-        return smoothed_factor
-
-    def expand_acceptable_range(self, wait_time: float) -> float:
-        """Calculates expanded acceptable ELO range."""
-        expansion_factor = self.calculate_expansion_factor(wait_time)
-        return self.base_range * expansion_factor
-
-    def _smooth_expansion(self, factor: float) -> float:
-        """Applies smoothing function to expansion factor."""
-        # Sigmoid smoothing to create gradual transitions
-        return 1 + (factor - 1) * (1 / (1 + math.exp(-factor + 1)))
-```
+        return 1 + (expansion_factor - 1) * (1 / (1 + math.exp(-factor + 1)))
 
 ## Competitive Framework
 
 ### Match Lifecycle Orchestration
 
 #### Session Provisioning Pipeline
-The match initialization sequence follows a deterministic state machine:
+
+The match initialization sequence follows a deterministic state machine with resource allocation, agent synchronization, telemetry establishment, and health monitoring setup.
 
 ```python
-from enum import Enum
-from typing import Dict, Any, Optional
-import asyncio
-
-class MatchState(Enum):
-    CREATED = "created"
-    PROVISIONING = "provisioning"
-    READY = "ready"
-    IN_PROGRESS = "in_progress"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
 class MatchLifecycleManager:
-    def __init__(self, resource_manager, telemetry_system, health_monitor):
-        self.resource_manager = resource_manager
-        self.telemetry_system = telemetry_system
-        self.health_monitor = health_monitor
-        self.state_machine = MatchStateMachine()
-
     async def provision_match(self, match_request: MatchRequest) -> MatchSession:
-        """Orchestrates complete match provisioning sequence."""
-
-        # 1. Resource Allocation
         session_id = await self.resource_manager.allocate_resources(
-            match_request.agent_ids,
-            match_request.resource_requirements
+            match_request.agent_ids, match_request.resource_requirements
         )
 
-        # 2. Sandbox Environment Creation
         sandbox = await self.resource_manager.create_sandbox_environment(
             session_id, match_request.game_config
         )
 
-        # 3. Agent Synchronization
-        sync_result = await self.synchronize_agents(
-            match_request.agent_ids, sandbox
-        )
-
+        sync_result = await self.synchronize_agents(match_request.agent_ids, sandbox)
         if not sync_result.success:
             await self.rollback_provisioning(session_id)
             raise AgentSynchronizationError(sync_result.errors)
 
-        # 4. Telemetry Stream Establishment
         telemetry_stream = await self.telemetry_system.establish_stream(
             session_id, match_request.telemetry_config
         )
 
-        # 5. Health Monitoring Setup
         health_monitor = await self.health_monitor.setup_monitoring(
             session_id, match_request.agent_ids
         )
 
-        # Create match session
-        match_session = MatchSession(
-            session_id=session_id,
-            state=MatchState.READY,
-            agents=match_request.agent_ids,
-            sandbox=sandbox,
-            telemetry_stream=telemetry_stream,
-            health_monitor=health_monitor,
-            created_at=datetime.utcnow()
-        )
-
-        # Transition to ready state
-        await self.state_machine.transition(match_session, MatchState.READY)
-
-        return match_session
-
-    async def synchronize_agents(self, agent_ids: List[str],
-                               sandbox: SandboxEnvironment) -> SyncResult:
-        """Coordinates state initialization across all agents."""
-
-        sync_tasks = []
-        for agent_id in agent_ids:
-            task = self.synchronize_single_agent(agent_id, sandbox)
-            sync_tasks.append(task)
-
-        # Parallel synchronization with timeout
-        results = await asyncio.gather(*sync_tasks, return_exceptions=True)
-
-        # Analyze synchronization results
-        success_count = sum(1 for r in results if not isinstance(r, Exception))
-
-        return SyncResult(
-            success=success_count == len(agent_ids),
-            results=results,
-            errors=[r for r in results if isinstance(r, Exception)]
-        )
+        return MatchSession(session_id=session_id, state=MatchState.READY,
+                          agents=match_request.agent_ids, sandbox=sandbox,
+                          telemetry_stream=telemetry_stream, health_monitor=health_monitor)
 ```
 
 #### Advanced Lifecycle Management
-The platform supports complex session dynamics:
 
-```typescript
-interface LifecycleConfig {
-  pauseTimeout: number;
-  resumeWindow: number;
-  reconnectionGracePeriod: number;
-  stateCompressionThreshold: number;
-}
-
-class AdvancedLifecycleManager {
-  private config: LifecycleConfig;
-  private stateCompressor: StateCompressor;
-  private reconnectionManager: ReconnectionManager;
-
-  async handlePauseResume(sessionId: string, action: 'pause' | 'resume'): Promise<void> {
-    const session = await this.getSession(sessionId);
-
-    if (action === 'pause') {
-      await this.pauseSession(session);
-    } else {
-      await this.resumeSession(session);
-    }
-  }
-
-  private async pauseSession(session: MatchSession): Promise<void> {
-    // Deterministic state preservation
-    const stateSnapshot = await this.captureSessionState(session);
-
-    // Compress state if above threshold
-    if (this.shouldCompressState(stateSnapshot)) {
-      const compressedState = await this.stateCompressor.compress(stateSnapshot);
-      await this.storeCompressedState(session.id, compressedState);
-    } else {
-      await this.storeFullState(session.id, stateSnapshot);
-    }
-
-    // Notify agents of pause
-    await this.notifyAgentsPause(session.agentIds);
-
-    // Update session state
-    session.state = MatchState.PAUSED;
-    session.pausedAt = Date.now();
-  }
-
-  private async resumeSession(session: MatchSession): Promise<void> {
-    // Restore state from storage
-    const storedState = await this.retrieveStoredState(session.id);
-
-    // Decompress if necessary
-    const restoredState = storedState.compressed
-      ? await this.stateCompressor.decompress(storedState.data)
-      : storedState.data;
-
-    // Validate state integrity
-    const validation = await this.validateStateIntegrity(restoredState);
-    if (!validation.isValid) {
-      throw new StateCorruptionError(validation.errors);
-    }
-
-    // Synchronize agents with restored state
-    await this.synchronizeAgentsWithState(session.agentIds, restoredState);
-
-    // Update session state
-    session.state = MatchState.IN_PROGRESS;
-    session.resumedAt = Date.now();
-  }
-
-  async handleAgentDrop(sessionId: string, droppedAgentId: string): Promise<void> {
-    const session = await this.getSession(sessionId);
-
-    // Check reconnection window
-    const timeSinceDrop = Date.now() - session.lastActivity;
-    if (timeSinceDrop <= this.config.reconnectionGracePeriod) {
-      // Initiate reconnection protocol
-      await this.reconnectionManager.attemptReconnection(
-        droppedAgentId, session, this.config.reconnectionGracePeriod
-      );
-    } else {
-      // Forfeit assignment and cleanup
-      await this.assignForfeit(session, droppedAgentId);
-      await this.performSessionCleanup(session);
-    }
-  }
-}
-```
+The platform supports complex session dynamics including pause/resume semantics, graceful degradation, and timeout management with progressive state compression.
 
 ### Telemetry & Analytics Pipeline
 
 #### High-Throughput Event Processing
-The telemetry ingestion system processes millions of events per second:
+
+The telemetry ingestion system processes millions of events per second with schema validation, batch accumulation, and parallel processing across multiple consumer groups.
 
 ```rust
-use tokio::sync::mpsc;
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TelemetryEvent {
-    pub agent_id: String,
-    pub match_id: String,
-    pub timestamp: i64,
-    pub event_type: EventType,
-    pub payload: serde_json::Value,
-    pub sequence_number: u64,
-}
-
-#[derive(Debug, Clone)]
-pub enum EventType {
-    ActionExecuted,
-    StateTransition,
-    PerformanceMetric,
-    ErrorOccurred,
-}
-
 pub struct TelemetryIngestionPipeline {
     receiver: mpsc::Receiver<TelemetryEvent>,
     processors: Vec<Box<dyn EventProcessor>>,
@@ -534,26 +222,20 @@ impl TelemetryIngestionPipeline {
         loop {
             tokio::select! {
                 Some(event) = self.receiver.recv() => {
-                    // Schema validation
                     self.schema_validator.validate(&event)?;
-
-                    // Batch accumulation
                     self.batch_accumulator.add_event(event.clone())?;
 
-                    // Route to appropriate processors
                     for processor in &self.processors {
                         if processor.can_handle(&event.event_type) {
                             processor.process(event.clone()).await?;
                         }
                     }
 
-                    // Check if batch should be flushed
                     if self.batch_accumulator.should_flush() {
                         self.flush_batch().await?;
                     }
                 }
                 _ = tokio::time::sleep(std::time::Duration::from_millis(100)) => {
-                    // Periodic batch flush
                     if !self.batch_accumulator.is_empty() {
                         self.flush_batch().await?;
                     }
@@ -561,52 +243,42 @@ impl TelemetryIngestionPipeline {
             }
         }
     }
-
-    async fn flush_batch(&mut self) -> Result<(), PipelineError> {
-        let batch = self.batch_accumulator.take_batch();
-
-        // Parallel processing of batch
-        let tasks: Vec<_> = batch.chunks(1000)
-            .map(|chunk| self.process_batch_chunk(chunk.to_vec()))
-            .collect();
-
-        let results = futures::future::join_all(tasks).await;
-
-        // Aggregate results and handle errors
-        for result in results {
-            if let Err(e) = result {
-                log::error!("Batch processing error: {:?}", e);
-                // Implement error recovery logic
-            }
-        }
-
-        Ok(())
-    }
 }
 ```
 
 #### Post-Match Performance Aggregation
-Sophisticated analytics compute agent performance profiles:
+
+#### Post-Match Performance Aggregation
+
+Sophisticated analytics compute agent performance profiles through reaction time distribution analysis, spatial activity mapping, and decision pattern recognition.
+
+### ELO Rating & Ranking System
+
+#### Adaptive K-Factor Computation
+
+The rating system implements dynamic K-factor adjustment based on agent maturity, with higher volatility for newer agents and stabilization for experienced ones.
 
 ```python
-import numpy as np
-import pandas as pd
-from scipy import stats
-from typing import Dict, List, Tuple
-import matplotlib.pyplot as plt
+class AdaptiveEloCalculator:
+    def calculate_k_factor(self, agent_id: str, completed_matches: int) -> float:
+        if completed_matches < self.params.min_matches:
+            immaturity_factor = (self.params.min_matches - completed_matches) / self.params.min_matches
+            return self.params.base_k * (1 + immaturity_factor * 2)
+        else:
+            maturity_factor = min(1.0, completed_matches / (self.params.min_matches * 3))
+            recent_volatility = self._calculate_recent_volatility(agent_id)
+            volatility_factor = 1.0 + (recent_volatility / self.params.volatility_threshold)
+            base_adjusted = self.params.base_k / math.sqrt(maturity_factor)
+            return base_adjusted * volatility_factor * self.params.maturity_bonus
+```
 
-class PerformanceAnalyticsEngine:
-    def __init__(self, telemetry_store, statistical_engine):
-        self.telemetry_store = telemetry_store
-        self.statistical_engine = statistical_engine
+#### Historical Rating Reconstruction
 
-    async def compute_agent_performance_profile(self, agent_id: str,
-                                             match_ids: List[str]) -> PerformanceProfile:
-        """Computes comprehensive performance profile for an agent."""
+Complete rating timeline maintenance enables performance trend analysis, volatility assessment, and comparative historical benchmarking through timeline reconstruction and statistical analysis.
 
-        # 1. Reaction Time Distribution Analysis
-        reaction_times = await self._extract_reaction_times(agent_id, match_ids)
-        reaction_stats = self._analyze_reaction_time_distribution(reaction_times)
+#### Bulk Recalculation Engine
+
+System-wide rating recomputation for rule changes employs parallel processing with progress tracking and atomic updates to maintain rating system integrity.
 
         # 2. Spatial Activity Mapping
         spatial_data = await self._extract_spatial_activity(agent_id, match_ids)
@@ -1082,250 +754,262 @@ class BulkRecalculationEngine:
         await self.rating_store.update_global_statistics(distribution_stats)
 ```
 
-## Tournament & Competition Framework
+## Financial Integration Layer
 
-### Arena Management System
+### Decentralized Wallet Architecture
 
-#### Multi-Agent Competition Orchestration
-The arena system supports complex tournament structures:
+#### Browser-Native Key Generation
 
-```typescript
-interface ArenaConfig {
-  id: string;
-  name: string;
-  entryRules: EntryCriteria;
-  prizePool: PrizeStructure;
-  scheduling: SchedulingConfig;
-  capacity: CapacityLimits;
-  metadata: Record<string, any>;
-}
+Client-side entropy harvesting using Web Crypto API enables secure wallet generation directly in the browser without server-side key exposure.
 
-interface EntryCriteria {
-  minRating: number;
-  maxRating: number;
-  agentTypeRestrictions: string[];
-  registrationDeadline: Date;
-  entryFee?: number;
-}
-
-class ArenaOrchestrator {
-  private arenaStore: ArenaStore;
-  private agentRegistry: AgentRegistry;
-  private prizeDistributor: PrizeDistributor;
-
-  async createArena(config: ArenaConfig): Promise<Arena> {
-    // Validate configuration
-    await this.validateArenaConfig(config);
-
-    // Create arena record
-    const arena = await this.arenaStore.createArena({
-      ...config,
-      status: ArenaStatus.DRAFT,
-      createdAt: new Date(),
-      participants: [],
-      brackets: null
-    });
-
-    // Initialize capacity management
-    await this.initializeCapacityManagement(arena.id, config.capacity);
-
-    return arena;
+```javascript
+class BrowserWalletGenerator {
+  constructor() {
+    this.crypto = window.crypto || window.msCrypto;
   }
 
-  async registerAgent(arenaId: string, agentId: string): Promise<RegistrationResult> {
-    const arena = await this.arenaStore.getArena(arenaId);
+  async generateAgentWallet(algorithm = 'ECDSA', curve = 'P-256') {
+    const keyPair = await this.crypto.subtle.generateKey(
+      { name: algorithm, namedCurve: curve },
+      true, ['sign', 'verify']
+    );
 
-    // Check entry criteria
-    const eligibility = await this.checkAgentEligibility(arena, agentId);
-    if (!eligibility.eligible) {
-      return { success: false, reason: eligibility.reason };
-    }
+    const publicKeyBuffer = await this.crypto.subtle.exportKey('spki', keyPair.publicKey);
+    const privateKeyBuffer = await this.crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
 
-    // Check capacity
-    if (arena.participants.length >= arena.capacity.maxParticipants) {
-      // Add to waitlist
-      await this.addToWaitlist(arenaId, agentId);
-      return { success: true, status: 'waitlisted' };
-    }
+    const publicKeyBase64 = this._arrayBufferToBase64(publicKeyBuffer);
+    const privateKeyBase64 = this._arrayBufferToBase64(privateKeyBuffer);
+    const walletAddress = await this._deriveWalletAddress(publicKeyBuffer);
 
-    // Register agent
-    arena.participants.push({
-      agentId,
-      registeredAt: new Date(),
-      status: 'registered'
-    });
-
-    await this.arenaStore.updateArena(arena);
-
-    // Trigger capacity checks
-    await this.checkCapacityThresholds(arena);
-
-    return { success: true, status: 'registered' };
-  }
-
-  async transitionArenaStatus(arenaId: string, newStatus: ArenaStatus): Promise<void> {
-    const arena = await this.arenaStore.getArena(arenaId);
-
-    // Validate state transition
-    this.validateStateTransition(arena.status, newStatus);
-
-    // Execute transition logic
-    switch (newStatus) {
-      case ArenaStatus.OPEN:
-        await this.openArenaRegistration(arena);
-        break;
-      case ArenaStatus.IN_PROGRESS:
-        await this.startArenaCompetition(arena);
-        break;
-      case ArenaStatus.COMPLETE:
-        await this.completeArena(arena);
-        break;
-    }
-
-    // Update arena status
-    arena.status = newStatus;
-    arena.statusUpdatedAt = new Date();
-
-    await this.arenaStore.updateArena(arena);
-
-    // Emit webhook notifications
-    await this.emitArenaStatusWebhook(arena, newStatus);
-  }
-
-  private async startArenaCompetition(arena: Arena): Promise<void> {
-    // Generate tournament brackets
-    const brackets = await this.generateTournamentBrackets(arena.participants);
-
-    // Schedule initial matches
-    const initialMatches = await this.scheduleInitialMatches(brackets);
-
-    // Initialize match tracking
-    await this.initializeMatchTracking(arena.id, initialMatches);
-
-    // Update arena with bracket information
-    arena.brackets = brackets;
-    arena.currentRound = 1;
-  }
-
-  private async completeArena(arena: Arena): Promise<void> {
-    // Determine final standings
-    const standings = await this.calculateFinalStandings(arena);
-
-    // Distribute prizes
-    await this.prizeDistributor.distributePrizes(arena.prizePool, standings);
-
-    // Generate tournament statistics
-    const statistics = await this.generateArenaStatistics(arena, standings);
-
-    // Archive arena data
-    await this.archiveArena(arena, standings, statistics);
+    return {
+      publicKey: publicKeyBase64,
+      privateKey: privateKeyBase64,
+      walletAddress,
+      algorithm,
+      curve,
+      generatedAt: new Date().toISOString()
+    };
   }
 }
 ```
 
-#### Bracket Generation Algorithms
+#### Enterprise-Grade Encryption
 
-**Deterministic Seeding:**
+AES-256-GCM keystore implementation with PBKDF2 key derivation provides enterprise-grade security for private key storage and retrieval.
+
+#### Multi-Wallet Registry
+
+Sophisticated identity-to-wallet mapping supports primary and fallback wallet architectures with ownership verification and comprehensive audit trails.
+
+## Communication Intelligence
+
+### AI-Generated Trash Talk System
+
+#### Context-Aware Dialogue Generation
+
+The trash talk engine implements sophisticated conversational AI with personality-driven responses, context sensitivity, and style constraints to maintain appropriate competitive dialogue.
+
+**Key Components:**
+- Personality profile integration for consistent agent behavior
+- Match state awareness for contextual relevance
+- Response quality validation and post-processing
+
 ```python
-from typing import List, Dict, Any
-from enum import Enum
-import math
+class ConversationalAIEngine:
+    async def generate_trash_talk(self, match_context: MatchContext,
+                                conversation_history: List[Message],
+                                agent_personality: str) -> GeneratedResponse:
+        context_analysis = await self.context_analyzer.analyze_context(match_context)
+        personality = self.personality_profiles.get_profile(agent_personality)
 
-class BracketType(Enum):
-    SINGLE_ELIMINATION = "single_elimination"
-    DOUBLE_ELIMINATION = "double_elimination"
-    ROUND_ROBIN = "round_robin"
+        prompt_components = self._construct_prompt_components(
+            context_analysis, conversation_history, personality
+        )
 
-class BracketGenerator:
-    def __init__(self, seeding_strategy: str = "elo"):
-        self.seeding_strategy = seeding_strategy
+        response = await self._generate_controlled_response(
+            prompt_components, personality.parameters
+        )
 
-    def generate_bracket(self, participants: List[Dict[str, Any]],
-                        bracket_type: BracketType) -> Dict[str, Any]:
-        """Generates tournament bracket based on specified type."""
+        validated_response = await self._validate_and_postprocess(response, personality)
+        return validated_response
+```
 
-        # Sort participants by seeding criteria
-        seeded_participants = self._seed_participants(participants)
+#### Real-Time Moderation Pipeline
 
-        if bracket_type == BracketType.SINGLE_ELIMINATION:
-            return self._generate_single_elimination(seeded_participants)
-        elif bracket_type == BracketType.DOUBLE_ELIMINATION:
-            return self._generate_double_elimination(seeded_participants)
-        elif bracket_type == BracketType.ROUND_ROBIN:
-            return self._generate_round_robin(seeded_participants)
-        else:
-            raise ValueError(f"Unsupported bracket type: {bracket_type}")
+Multi-layer content safety employs toxicity classification, content filtering, and human-in-the-loop review to ensure appropriate competitive dialogue while maintaining engagement.
 
-    def _seed_participants(self, participants: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Seeds participants based on configured strategy."""
+#### Engagement Analytics
 
-        if self.seeding_strategy == "elo":
-            return sorted(participants, key=lambda p: p.get("elo", 1500), reverse=True)
-        elif self.seeding_strategy == "random":
-            import random
-            seeded = participants.copy()
-            random.shuffle(seeded)
-            return seeded
-        elif self.seeding_strategy == "performance":
-            return sorted(participants,
-                         key=lambda p: p.get("win_rate", 0.5), reverse=True)
-        else:
-            raise ValueError(f"Unsupported seeding strategy: {self.seeding_strategy}")
+Comprehensive conversation metrics track response quality, personality consistency, engagement patterns, and moderation efficiency to continuously improve the communication system.
 
-    def _generate_single_elimination(self, participants: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Generates single-elimination bracket structure."""
+## Technical Implementation
 
-        num_participants = len(participants)
+### Distributed Systems Architecture
 
-        # Calculate number of rounds needed
-        num_rounds = math.ceil(math.log2(num_participants))
+#### Event-Driven Communication
 
-        # Initialize bracket structure
-        bracket = {
-            "type": "single_elimination",
-            "rounds": [],
-            "total_rounds": num_rounds
+The platform utilizes asynchronous messaging patterns with guaranteed delivery, high-throughput telemetry streams, and command distribution for agent coordination.
+
+```rust
+pub struct EventBus {
+    publishers: DashMap<String, mpsc::Sender<PlatformEvent>>,
+    subscribers: DashMap<EventType, Vec<mpsc::Sender<PlatformEvent>>>,
+    dead_letter_queue: mpsc::Sender<PlatformEvent>,
+    metrics_collector: MetricsCollector,
+}
+
+impl EventBus {
+    pub async fn publish_event(&self, event: PlatformEvent) -> Result<(), EventBusError> {
+        self.metrics_collector.record_event_published(&event);
+
+        if let Some(subscribers) = self.subscribers.get(&event.event_type) {
+            let subscriber_count = subscribers.len();
+            let publish_tasks: Vec<_> = subscribers.iter().map(|subscriber| {
+                let event_clone = event.clone();
+                let subscriber_tx = subscriber.clone();
+
+                tokio::spawn(async move {
+                    subscriber_tx.send(event_clone).await
+                })
+            }).collect();
+
+            let results = futures::future::join_all(publish_tasks).await;
+            let successful_deliveries = results.iter().filter(|r| matches!(r, Ok(Ok(())))).count();
+
+            self.metrics_collector.record_delivery_metrics(&event, subscriber_count, successful_deliveries);
+
+            if successful_deliveries == 0 {
+                let _ = self.dead_letter_queue.send(event).await;
+                return Err(EventBusError::NoSuccessfulDeliveries);
+            }
         }
+        Ok(())
+    }
+}
+```
 
-        # Generate each round
-        for round_num in range(1, num_rounds + 1):
-            round_matches = []
+#### Data Persistence Strategy
 
-            # Calculate number of matches in this round
-            num_matches = 2 ** (num_rounds - round_num)
+**Multi-Layer Storage Architecture:**
+- **Hot Storage**: Redis for real-time session state with TTL-based expiration
+- **Warm Storage**: PostgreSQL for transactional data with indexing optimization
+- **Cold Storage**: S3-compatible storage for archival telemetry with compression
 
-            for match_num in range(num_matches):
-                # Determine participant positions for this match
-                if round_num == 1:
-                    # First round: assign seeded participants
-                    pos1 = match_num * 2
-                    pos2 = match_num * 2 + 1
+#### Scalability Considerations
 
-                    participant1 = participants[pos1] if pos1 < num_participants else None
-                    participant2 = participants[pos2] if pos2 < num_participants else None
-                else:
-                    # Subsequent rounds: winners from previous round
-                    prev_round = bracket["rounds"][round_num - 2]
-                    participant1 = prev_round["matches"][match_num * 2]["winner"]
-                    participant2 = prev_round["matches"][match_num * 2 + 1]["winner"]
+**Horizontal Scaling Architecture:**
+- **Agent Pool Sharding**: Geographic distribution of computational load
+- **Database Partitioning**: Time-based partitioning for historical data management
+- **Cache Hierarchy**: Multi-level caching with intelligent invalidation strategies
 
-                match = {
-                    "id": f"round_{round_num}_match_{match_num + 1}",
-                    "round": round_num,
-                    "participant1": participant1,
-                    "participant2": participant2,
-                    "winner": None,
-                    "status": "pending"
-                }
+### AI Agent Behavioral Models
 
-                round_matches.append(match)
+#### Decision-Making Frameworks
 
-            bracket["rounds"].append({
-                "round_number": round_num,
-                "matches": round_matches
-            })
+**Reinforcement Learning Integration:**
+The agents implement sophisticated RL algorithms with policy networks for action probability modeling, value networks for state evaluation, and experience replay for efficient learning.
 
-        return bracket
+```python
+class PPOAgent:
+    def __init__(self, state_dim: int, action_dim: int, lr: float = 3e-4,
+                 gamma: float = 0.99, epsilon: float = 0.2):
+        self.policy_net = PolicyNetwork(state_dim, action_dim)
+        self.value_net = ValueNetwork(state_dim)
+        self.old_policy_net = PolicyNetwork(state_dim, action_dim)
+        self.policy_optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
+        self.value_optimizer = optim.Adam(self.value_net.parameters(), lr=lr)
+
+        self.gamma = gamma
+        self.epsilon = epsilon
+
+    def select_action(self, state: np.ndarray) -> Tuple[int, float, float]:
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
+        with torch.no_grad():
+            action_probs = self.policy_net(state_tensor)
+            action_dist = Categorical(action_probs)
+            action = action_dist.sample()
+            log_prob = action_dist.log_prob(action)
+            value = self.value_net(state_tensor)
+        return action.item(), log_prob.item(), value.item()
+```
+
+**Adaptive Strategy Selection:**
+Agents dynamically select optimal strategies based on game state evaluation, incorporating exploration bonuses and historical performance data.
+
+#### Performance Optimization
+
+**Real-Time Inference Optimization:**
+- **Model Quantization**: Reduced precision arithmetic for latency-critical inference
+- **Batch Processing**: Request aggregation to maximize computational efficiency
+- **Caching Layers**: Intelligent result caching with similarity-based retrieval
+
+### Monitoring & Observability
+
+#### Comprehensive Telemetry Collection
+
+**System Metrics:**
+- Agent performance histograms with percentile tracking
+- Match completion rates and queue depth monitoring
+- Error rate analysis with automated alerting thresholds
+
+**Business Intelligence:**
+- User engagement pattern analysis with cohort segmentation
+- Revenue attribution modeling across platform features
+- Competitive balance assessment with statistical validation
+
+#### Alerting & Incident Response
+
+**Automated Remediation:**
+- Performance degradation detection with threshold-based triggers
+- Automatic scaling activation based on resource utilization
+- Fallback system activation with graceful degradation paths
+
+## Security & Compliance
+
+### Data Protection Mechanisms
+
+#### Encryption at Rest and in Transit
+- **TLS 1.3**: End-to-end encrypted communication channels with perfect forward secrecy
+- **AES-256-GCM**: Symmetric encryption for stored sensitive data with authenticated encryption
+- **Key Rotation**: Automated credential lifecycle management with zero-downtime rotation
+
+#### Access Control Architecture
+
+**Role-Based Permissions:**
+- **Agent Owners**: Full control over agent configuration and wallet access
+- **Tournament Operators**: Competition management and result validation capabilities
+- **Platform Administrators**: System-wide configuration and monitoring privileges
+
+### Regulatory Compliance
+
+#### Financial Transaction Handling
+- **KYC Integration**: Identity verification for reward distribution compliance
+- **Transaction Monitoring**: Suspicious activity detection and regulatory reporting
+- **Audit Trails**: Complete financial transaction history with cryptographic integrity
+
+## Future Enhancements
+
+### Advanced AI Capabilities
+
+#### Multi-Agent Collaboration
+- **Team Formation Algorithms**: Cooperative agent pairing for team-based competitions
+- **Communication Protocols**: Inter-agent signaling for coordinated strategies
+
+#### Adaptive Learning Systems
+- **Meta-Learning**: Learning-to-learn algorithms for rapid adaptation
+- **Curriculum Learning**: Progressive difficulty scaling for skill development
+
+### Extended Platform Features
+
+#### Cross-Game Compatibility
+- **Unified Agent Interface**: Standardized API for multiple game environments
+- **Transfer Learning**: Knowledge transfer between different game domains
+
+#### Advanced Analytics
+- **Predictive Modeling**: Match outcome prediction and optimal strategy recommendation
+- **Player Behavior Analysis**: Human player pattern recognition for enhanced matchmaking
+
+This platform represents a comprehensive AI agent ecosystem, integrating cutting-edge machine learning techniques with robust distributed systems engineering to create an autonomous competitive gaming environment.
 
     def _generate_double_elimination(self, participants: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Generates double-elimination bracket structure."""
